@@ -3,12 +3,14 @@ import type { AssistantMessage, Model } from "@earendil-works/pi-ai";
 import { createReadSkillTool, skillsPromptSection, type Skill } from "./skills.js";
 import { createRequestTools, createStaticTools } from "./tools.js";
 import type { HaConversationRequest } from "./types.js";
+import { DEBUG, debug } from "./debug.js";
 
 export interface HomeAssistantAgentOptions {
   model: Model<any>;
   /** The pi-ai stream function, e.g. `models.streamSimple.bind(models)`. Injectable for tests. */
   streamFn: ConstructorParameters<typeof Agent>[0]["streamFn"];
-  skills: Skill[];
+  /** Skills, or a loader called at the start of every run so SKILL.md edits apply without a restart. */
+  skills: Skill[] | (() => Promise<Skill[]>);
   /** Extra tools added to every run, e.g. the Home Assistant MCP tools. */
   extraTools?: AgentTool<any>[];
   /** Hard cap on tool-call rounds etc. is up to the model; this caps wall-clock time. */
@@ -36,7 +38,8 @@ export class HomeAssistantAgent {
   constructor(private readonly opts: HomeAssistantAgentOptions) {}
 
   async run(req: HaConversationRequest, run: RunOptions = {}): Promise<string> {
-    const { model, skills } = this.opts;
+    const { model } = this.opts;
+    const skills = typeof this.opts.skills === "function" ? await this.opts.skills() : this.opts.skills;
 
     // Static + per-request tools. Add or remove tools here; there is no bash unless you add one.
     const tools: AgentTool<any>[] = [
@@ -76,11 +79,25 @@ export class HomeAssistantAgent {
       sessionId: req.conversation_id,
     });
 
+    debug("system prompt", systemPrompt);
+    debug(`skills: ${skills.map((s) => s.name).join(", ") || "none"}`);
+    debug(`tools: ${tools.map((t) => t.name).join(", ")}`);
+    debug(`history: ${past.length} message(s); prompt: ${JSON.stringify(prompt)}`);
+
     let sawTextThisRun = false;
     agent.subscribe((event) => {
       if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
         sawTextThisRun = true;
         run.onTextDelta?.(event.assistantMessageEvent.delta);
+      }
+      if (!DEBUG) return;
+      if (event.type === "tool_execution_start") debug(`tool call ${event.toolName}`, event.args);
+      if (event.type === "tool_execution_end") {
+        debug(`tool ${event.isError ? "ERROR" : "result"} ${event.toolName} (${event.durationMs ?? "?"} ms)`, event.result);
+      }
+      if (event.type === "message_end" && event.message.role === "assistant") {
+        const { stopReason, usage, errorMessage } = event.message as AssistantMessage;
+        debug(`assistant turn: stop=${stopReason}`, { usage, ...(errorMessage ? { errorMessage } : {}) });
       }
     });
 
