@@ -1,0 +1,14 @@
+node_modules
+dist
+test
+secrets
+.env
+.env.*
+.git
+.gitignore
+.DS_Store
+*.log
+Dockerfile
+.dockerignore
+compose*.yaml
+CLAUDE.md

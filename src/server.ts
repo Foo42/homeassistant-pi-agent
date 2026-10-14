@@ -1,3 +1,4 @@
+import "./secrets.js"; // must stay first: loads *_FILE secrets into process.env
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "node:url";

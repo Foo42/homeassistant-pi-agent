@@ -8,6 +8,7 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "start-debug": "DEBUG=1 tsx src/server.ts",
+    "build": "tsc",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [],

@@ -1,0 +1,37 @@
+# Example service definition; merge into your existing compose file.
+# Secrets are files in ./secrets/ (one value per file, chmod 600, not committed),
+# mounted read-only at /run/secrets/<name> and loaded via the *_FILE variables.
+services:
+  ha-pi-agent:
+    build: .
+    restart: unless-stopped
+    # No ports needed when HA shares this compose network: in the integration, set the webhook URL to
+    # http://ha-pi-agent:8787/conversation. Publish "8787:8787" only to call it from outside.
+    environment:
+      # Use HA's compose service name. Override from the shell or a .env file next to the compose file:
+      #   HA_URL=http://my-ha:8123
+      HA_URL: ${HA_URL:-http://homeassistant:8123}
+      HA_TOKEN_FILE: /run/secrets/ha_token
+      ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
+      WEBHOOK_USER: ha
+      WEBHOOK_PASSWORD_FILE: /run/secrets/webhook_password
+      # PI_MODEL: claude-sonnet-4-6
+      # DEBUG: "1"
+    # If HA runs with `network_mode: host`, service names don't resolve. Use
+    # HA_URL=http://host.docker.internal:8123 and uncomment:
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"
+    secrets:
+      - ha_token
+      - anthropic_api_key
+      - webhook_password
+    # volumes:
+    #   - ./skills:/app/skills:ro # edit skills without rebuilding
+
+secrets:
+  ha_token:
+    file: ./secrets/ha_token
+  anthropic_api_key:
+    file: ./secrets/anthropic_api_key
+  webhook_password:
+    file: ./secrets/webhook_password
